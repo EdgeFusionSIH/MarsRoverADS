@@ -4,7 +4,7 @@ import time
 import os
 
 
-OUTPUT_FILE = "dataset/systemInfo.json"
+OUTPUT_FILE = "node1\\dataset\\systemInfo.json"
 
 
 def get_system_info():
