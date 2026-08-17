@@ -216,3 +216,14 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+#Custom
+/node1/dataset/
+/node2/dataset/
+
+#json
+/node1/inputs
+/node2/inputs
+/node1/outputs
+/node2/outputs
+
