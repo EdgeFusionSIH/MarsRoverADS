@@ -2,9 +2,10 @@ import psutil
 import json
 import time
 import os
+from pathlib import Path
 
 
-OUTPUT_FILE = "MarsRoverADS/node2/dataset/systemInfo.json"
+OUTPUT_FILE = Path(__file__).resolve().parent / "dataset" / "systemInfo.json"
 
 
 def get_system_info():
@@ -47,7 +48,7 @@ def get_system_info():
 
 def write_system_info():
     # Make sure dataset folder exists
-    os.makedirs("dataset", exist_ok=True)
+    #os.makedirs("dataset", exist_ok=True)
 
     while True:
         system_info = get_system_info()
