@@ -3,7 +3,7 @@ import json
 import os
 import websockets
 
-NODE3_IP = "172.20.10.12" # library test aug 18 10:10 PM hostel wifi
+NODE3_IP = "172.20.10.9" # library test aug 18 10:10 PM aarav phone hotspot
 PORT = 8767
 
 MY_FILE = "node1/outputs/p2pn1n3Output.json"

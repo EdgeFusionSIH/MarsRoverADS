@@ -5,7 +5,7 @@ import json
 import os
 import websockets
 
-NODE2_IP = "172.20.208.116" # library test aug 18 10:10 PM hostel wifi
+NODE2_IP = "172.20.10.14" # library test aug 18 10:10 PM aarav phone hotspot
 
 PORT = 8765
 
