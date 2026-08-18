@@ -42,8 +42,9 @@ for script in scripts:
 gui_dir = os.path.join(BASE_DIR, "GUI")
 if os.path.exists(gui_dir):
     print("[GUI] Launching Vite dev server...")
+    npx_cmd = "npx.cmd" if sys.platform == "win32" else "npx"
     p = subprocess.Popen(
-        ["npx", "vite", "--host"],
+        [npx_cmd, "vite", "--host"],
         cwd=gui_dir,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT

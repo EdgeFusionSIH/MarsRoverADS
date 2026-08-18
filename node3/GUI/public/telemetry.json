@@ -51,8 +51,39 @@
       50,
       50
     ]
+    "wheel_slip_percent": 10,
+    "motor_torque_nm": 50,
+    "wheel_slip_history": [
+      10,
+      20,
+      20,
+      20,
+      20,
+      20,
+      20,
+      20,
+      20,
+      20
+    ],
+    "motor_torque_history": [
+      50,
+      50,
+      50,
+      50,
+      50,
+      50,
+      50,
+      50,
+      50,
+      50
+    ]
   },
   "classifying_engine": {
+    "vision_classification": "Nominal",
+    "telemetry_classification": "Normal Torque",
+    "fusion_output": "NOMINAL \u2014 No Fusion Conflict",
+    "fusion_confidence": 0.85,
+    "rover_command": "NOMINAL"
     "vision_classification": "Nominal",
     "telemetry_classification": "Normal Torque",
     "fusion_output": "NOMINAL \u2014 No Fusion Conflict",
@@ -63,10 +94,12 @@
     "sync_status": "BUFFERING OFFLINE",
     "earth_signal_delay_sec": 1124,
     "logs": []
+    "logs": []
   },
   "chaos_bench": {
     "dust_storm_active": false,
     "sand_trap_injected": false,
+    "earth_uplink_enabled": false
     "earth_uplink_enabled": false
   }
 }
