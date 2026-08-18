@@ -6,21 +6,18 @@ import websockets
 HOST = "0.0.0.0"
 PORT = 8766
 
-MY_FILE = "node3/outputs/p2pn2n3Output.json"
-RECEIVED_FILE = "node3/inputs/p2pn2n3Input.json"
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+MY_FILE = os.path.join(BASE_DIR, "outputs", "p2pn2n3Output.json")
+RECEIVED_FILE = os.path.join(BASE_DIR, "inputs", "p2pn2n3Input.json")
 
 async def send_my_file(websocket):
-    last_modified = 0
     while True:
         try:
             if os.path.exists(MY_FILE):
-                modified = os.path.getmtime(MY_FILE)
-                if modified != last_modified:
-                    last_modified = modified
-                    with open(MY_FILE, "r") as file:
-                        data = json.load(file)
-                    await websocket.send(json.dumps(data))
-                    print("Sent node3 data:", data)
+                with open(MY_FILE, "r") as file:
+                    data = json.load(file)
+                await websocket.send(json.dumps(data))
+                print("Sent node3 data:", data)
         except Exception as e:
             print("Send error:", e)
         await asyncio.sleep(0.1)

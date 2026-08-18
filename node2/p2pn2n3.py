@@ -3,24 +3,21 @@ import json
 import os
 import websockets
 
-NODE3_IP = "172.20.10.9" #library test aug 18 10:10 PM aarav phone hotspot
+NODE3_IP = "172.20.10.13" # Change to actual Node 3 IP
 PORT = 8766
 
-MY_FILE = "node2/outputs/p2pn2n3Output.json"
-RECEIVED_FILE = "node2/inputs/p2pn2n3Input.json"
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+MY_FILE = os.path.join(BASE_DIR, "outputs", "p2pn2n3Output.json")
+RECEIVED_FILE = os.path.join(BASE_DIR, "inputs", "p2pn2n3Input.json")
 
 async def send_my_file(websocket):
-    last_modified = 0
     while True:
         try:
             if os.path.exists(MY_FILE):
-                modified = os.path.getmtime(MY_FILE)
-                if modified != last_modified:
-                    last_modified = modified
-                    with open(MY_FILE, "r") as file:
-                        data = json.load(file)
-                    await websocket.send(json.dumps(data))
-                    print("Sent node2 data:", data)
+                with open(MY_FILE, "r") as file:
+                    data = json.load(file)
+                await websocket.send(json.dumps(data))
+                print("Sent node2 data:", data)
         except Exception as e:
             print("Send error:", e)
         await asyncio.sleep(0.1)
@@ -39,12 +36,15 @@ async def receive_data(websocket):
 async def main():
     uri = f"ws://{NODE3_IP}:{PORT}"
     print("Connecting to node3 on 8766...")
-    async with websockets.connect(uri) as websocket:
-        print("Connected to node3!")
-        await asyncio.gather(
-            send_my_file(websocket),
-            receive_data(websocket)
-        )
+    try:
+        async with websockets.connect(uri) as websocket:
+            print("Connected to node3!")
+            await asyncio.gather(
+                send_my_file(websocket),
+                receive_data(websocket)
+            )
+    except Exception as e:
+        print(f"Failed to connect to node 3: {e}")
 
 if __name__ == "__main__":
     asyncio.run(main())

@@ -6,22 +6,19 @@ import websockets
 HOST = "0.0.0.0"
 PORT = 8767
 
-MY_FILE = "node3/outputs/p2pn1n3Output.json"
-RECEIVED_FILE = "node3/inputs/p2pn1n3Input.json"
-RECEIVED_IMAGE = "node3/inputs/lastFrame.jpg"
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+MY_FILE = os.path.join(BASE_DIR, "outputs", "p2pn1n3Output.json")
+RECEIVED_FILE = os.path.join(BASE_DIR, "inputs", "p2pn1n3Input.json")
+RECEIVED_IMAGE = os.path.join(BASE_DIR, "inputs", "lastFrame.jpg")
 
 async def send_my_file(websocket):
-    last_modified = 0
     while True:
         try:
             if os.path.exists(MY_FILE):
-                modified = os.path.getmtime(MY_FILE)
-                if modified != last_modified:
-                    last_modified = modified
-                    with open(MY_FILE, "r") as file:
-                        data = json.load(file)
-                    await websocket.send(json.dumps(data))
-                    print("Sent node3 data:", data)
+                with open(MY_FILE, "r") as file:
+                    data = json.load(file)
+                await websocket.send(json.dumps(data))
+                print("Sent node3 data:", data)
         except Exception as e:
             print("Send error:", e)
         await asyncio.sleep(0.1)
@@ -30,7 +27,6 @@ async def receive_data(websocket):
     async for message in websocket:
         try:
             if isinstance(message, bytes):
-                # Binary data is the image
                 os.makedirs(os.path.dirname(RECEIVED_IMAGE), exist_ok=True)
                 with open(RECEIVED_IMAGE, "wb") as f:
                     f.write(message)
