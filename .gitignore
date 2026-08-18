@@ -231,3 +231,4 @@ __marimo__/
 /node3/outputs/
 .DS_Store
 /weights
+node3/GUI/public/telemetry.json
