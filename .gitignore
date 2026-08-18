@@ -225,7 +225,7 @@ __marimo__/
 #json
 /node1/inputs
 /node2/inputs
+/node3/inputs
 /node1/outputs
 /node2/outputs
-/node3/inputs
 /node3/outputs
