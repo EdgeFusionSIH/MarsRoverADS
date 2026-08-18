@@ -6,8 +6,8 @@ import websockets
 BHAVIKA_IP = "172.20.10.12"
 PORT = 8765
 
-MY_FILE = "node1/output/p2pn1n2Output.json"
-RECEIVED_FILE = "node1/inputs/p2pn1n2Input.json"
+MY_FILE = "node1\\outputs\\p2pn1n2Output.json"
+RECEIVED_FILE = "node1\\inputs\\p2pn1n2Input.json"
 
 
 async def send_my_file(websocket):
