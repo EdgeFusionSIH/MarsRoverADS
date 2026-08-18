@@ -3,7 +3,7 @@ import json
 import os
 import websockets
 
-BHAVIKA_IP = "172.20.10.12"
+NODE2_IP = "172.20.10.12"
 PORT = 8765
 
 MY_FILE = "node1/output/p2pn1n2Output.json"
@@ -24,7 +24,7 @@ async def send_my_file(websocket):
                     data = json.load(file)
 
                 await websocket.send(json.dumps(data))
-                print("Sent Tiyas's data:", data)
+                print("Sent node1 data:", data)
 
         except Exception as e:
             print("Send error:", e)
@@ -40,19 +40,19 @@ async def receive_data(websocket):
             with open(RECEIVED_FILE, "w") as file:
                 json.dump(data, file, indent=4)
 
-            print("Received Bhavika's data:", data)
+            print("Received node2's data:", data)
 
         except Exception as e:
             print("Receive error:", e)
 
 
 async def main():
-    uri = f"ws://{BHAVIKA_IP}:{PORT}"
+    uri = f"ws://{NODE2_IP}:{PORT}"
 
-    print("Connecting to Bhavika...")
+    print("Connecting to node2...")
 
     async with websockets.connect(uri) as websocket:
-        print("Connected to Bhavika!")
+        print("Connected to node2!")
 
         await asyncio.gather(
             send_my_file(websocket),

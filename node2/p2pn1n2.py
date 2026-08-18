@@ -24,7 +24,7 @@ async def send_my_file(websocket):
                     data = json.load(file)
 
                 await websocket.send(json.dumps(data))
-                print("Sent Bhavika's data:", data)
+                print("Sent node2 data:", data)
 
         except Exception as e:
             print("Send error:", e)
@@ -40,14 +40,14 @@ async def receive_data(websocket):
             with open(RECEIVED_FILE, "w") as file:
                 json.dump(data, file, indent=4)
 
-            print("Received Tiyas's data:", data)
+            print("Received node1's data:", data)
 
         except Exception as e:
             print("Receive error:", e)
 
 
 async def handler(websocket):
-    print("Tiyas connected!")
+    print("node1 connected!")
 
     await asyncio.gather(
         send_my_file(websocket),
