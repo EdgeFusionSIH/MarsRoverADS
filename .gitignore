@@ -226,4 +226,7 @@ __marimo__/
 /node2/inputs
 /node1/outputs
 /node2/outputs
-    
+
+/node3/dataset/
+/node3/inputs
+/node3/outputs

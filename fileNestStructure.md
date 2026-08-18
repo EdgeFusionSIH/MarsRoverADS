@@ -8,7 +8,7 @@
 	- inputs 
 		- p2pn1n2Input.json {Image number, Model to be used}
 		- p2pn1n3Input.json {NIL}
-	- vision.py //{running the yolo multi-server}
+	- vision.py //{running the yolo multi-server and also writes systemInfo in node1/outputs/p2pn1n3Output.json}
 	- sysUs.py //{running find system usage finder}
 	- p2pn1n3.py {websocket between node1 and node 3, sending lastFrame.jpg}
 	- p2pn1n2.py {websocket between node1 and node 2, sending p2pn1n2Output.json, recieving p2pn1n2Input.json}
@@ -26,7 +26,7 @@
 		- p2pn1n2Input.json //{Sys info and object detection info}
 		- p2pn2n3Input.json //{Chaos Bench}
 	- checker.py //{running the csv file interpretation server}
-	- forest.py
+	- main.py
 	- sysUs.py //{Runs to find system usage}
 	- p2pn2n3.py //{Websocket for the node1 and node 2, sending p2pn1n2Output.json, p2pn1n2Input.json}
 	- p2pn1n2.py
