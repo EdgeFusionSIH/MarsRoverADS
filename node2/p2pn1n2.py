@@ -6,7 +6,7 @@ import websockets
 HOST = "0.0.0.0"
 PORT = 8765
 
-MY_FILE = "node2/output/p2pn1n2Output.json"
+MY_FILE = "node2/outputs/p2pn1n2Output.json"
 RECEIVED_FILE = "node2/inputs/p2pn1n2Input.json"
 
 
