@@ -3,10 +3,10 @@ import json
 import os
 import websockets
 
-BHAVIKA_IP = "172.20.10.13"
+HOST = "0.0.0.0"
 PORT = 8765
 
-MY_FILE = "outputs/p2pn1n2Output.json"
+MY_FILE = "output/p2pn1n2Output.json"
 RECEIVED_FILE = "inputs/p2pn1n2Input.json"
 
 
@@ -24,7 +24,7 @@ async def send_my_file(websocket):
                     data = json.load(file)
 
                 await websocket.send(json.dumps(data))
-                print("Sent Tiyas's data:", data)
+                print("Sent Bhavika's data:", data)
 
         except Exception as e:
             print("Send error:", e)
@@ -40,24 +40,25 @@ async def receive_data(websocket):
             with open(RECEIVED_FILE, "w") as file:
                 json.dump(data, file, indent=4)
 
-            print("Received Bhavika's data:", data)
+            print("Received Tiyas's data:", data)
 
         except Exception as e:
             print("Receive error:", e)
 
 
+async def handler(websocket):
+    print("Tiyas connected!")
+
+    await asyncio.gather(
+        send_my_file(websocket),
+        receive_data(websocket)
+    )
+
+
 async def main():
-    uri = f"ws://{BHAVIKA_IP}:{PORT}"
-
-    print("Connecting to Bhavika...")
-
-    async with websockets.connect(uri) as websocket:
-        print("Connected to Bhavika!")
-
-        await asyncio.gather(
-            send_my_file(websocket),
-            receive_data(websocket)
-        )
+    async with websockets.serve(handler, HOST, PORT):
+        print("WebSocket server running on port 8765")
+        await asyncio.Future()
 
 
 asyncio.run(main())
