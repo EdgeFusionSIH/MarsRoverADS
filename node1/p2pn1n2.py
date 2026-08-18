@@ -5,7 +5,8 @@ import json
 import os
 import websockets
 
-NODE2_IP = "172.20.10.12"
+NODE2_IP = "172.20.208.116" # library test aug 18 10:10 PM hostel wifi
+
 PORT = 8765
 
 MY_FILE = "node1\\outputs\\p2pn1n2Output.json"
