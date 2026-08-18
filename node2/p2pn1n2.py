@@ -6,8 +6,8 @@ import websockets
 HOST = "0.0.0.0"
 PORT = 8765
 
-MY_FILE = "output/p2pn1n2Output.json"
-RECEIVED_FILE = "inputs/p2pn1n2Input.json"
+MY_FILE = "node2/output/p2pn1n2Output.json"
+RECEIVED_FILE = "node2/inputs/p2pn1n2Input.json"
 
 
 async def send_my_file(websocket):
