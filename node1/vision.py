@@ -26,11 +26,6 @@ SYS_INFO_JSON = os.path.join(DATASET_DIR, "systemInfo.json")
 CURRENT_FRAME = os.path.join(OUTPUT_DIR, "currentFrame.jpg")
 LAST_FRAME = os.path.join(OUTPUT_DIR, "lastFrame.jpg")
 
-MODEL_PATHS = {
-    "yolov8m": os.path.join(BASE_DIR, "yolov8m.pt"),
-    "yolov8n": os.path.join(BASE_DIR, "yolov8n.pt"),
-}
-
 # ============================================================
 # INITIALIZATION
 # ============================================================
@@ -56,31 +51,45 @@ def find_image(image_number):
     return img_path
 
 
-def load_model(model_name):
-    path = MODEL_PATHS.get(model_name)
-    if not path or not os.path.exists(path):
-        print(f"Model file not found: {path}")
-        return None
-    return YOLO(path)
+def load_rover_model(model_tier):
+    """
+    Loads YOLO-World dynamically based on the requested tier.
+    Both fit easily within an 8GB VRAM GPU.
+    """
+    # 1. Map the JSON request to the specific YOLO-World weights
+    if model_tier == "medium":
+        model_name = "yolov8m-world.pt"
+        print("Model Tier: MEDIUM (yolov8m-world.pt) - Prioritizing Accuracy")
+    else:
+        # Default to light
+        model_name = "yolov8s-world.pt"
+        print("Model Tier: LIGHT (yolov8s-world.pt) - Prioritizing Speed")
+
+    # 2. Load the model (Ultralytics will auto-download it on the first run)
+    model = YOLO(model_name)
+    
+    # 3. Inject the zero-shot Martian anomaly classes
+    custom_classes = ["rock", "boulder", "crater", "obstacle"]
+    model.set_classes(custom_classes)
+    
+    print(f"Zero-Shot targets locked: {custom_classes}")
+    return model
 
 
 def run_detection(model, image_path):
-    # Read the image
     img = cv2.imread(image_path)
     if img is None:
-        print("Error: Could not read image file. (Check if it is 0 bytes or corrupted).")
+        print("Error: Could not read image file.")
         return None
 
-    # Run inference
-    results = model(img)
+    # Run inference with a lower confidence threshold for zero-shot text matching
+    results = model(img, conf=0.15)
     
     detections = []
     
     for r in results:
-        # Draw bounding boxes on the image
         img_with_boxes = r.plot()
         
-        # Extract object names and confidences
         for box in r.boxes:
             conf = float(box.conf[0]) * 100
             cls = int(box.cls[0])
@@ -98,30 +107,27 @@ def run_detection(model, image_path):
 
 def generate_outputs(detections):
     # 1. Gather System Hardware Telemetry
-    raw_sys = sysUs.get_system_usage()
+    raw_sys = sysUs.get_system_info()
     
-    # Extract first GPU usage safely
-    gpu_val = 0.0
-    if raw_sys.get("gpu") and len(raw_sys["gpu"]) > 0:
-        gpu_val = raw_sys["gpu"][0]["usage_percent"]
-        
-    # Get Disk usage (Not in sysUs.py, required by JSON format)
+    # Safely grab the numbers. If a key isn't found, it defaults to 0.0 so it never crashes.
+    cpu_val = raw_sys.get("cpu", raw_sys.get("cpu_usage_percent", 0.0))
+    gpu_val = raw_sys.get("gpu", 0.0)
+    ram_val = raw_sys.get("ram", raw_sys.get("ram_usage_percent", 0.0))
     disk_val = round(psutil.disk_usage('/').percent, 1)
 
     sysus_dict = {
         "nodeid": 1,
-        "cpu": raw_sys["cpu_usage_percent"],
+        "cpu": cpu_val,
         "gpu": gpu_val,
-        "ram": raw_sys["ram_usage_percent"],
+        "ram": ram_val,
         "disk": disk_val
     }
 
-    # 2. Write systemInfo.json to dataset folder
+    # 2. Write systemInfo.json
     with open(SYS_INFO_JSON, "w") as f:
         json.dump(sysus_dict, f, indent=4)
         
     # 3. Format Top 3 Objects
-    # Sort by confidence descending
     sorted_dets = sorted(detections, key=lambda x: x['confidence'], reverse=True)
     top_3 = sorted_dets[:3]
     
@@ -147,41 +153,34 @@ def generate_outputs(detections):
 
 def main():
     print("========================================")
-    print("       NODE 1 VISION & TELEMETRY")
+    print("  NODE 1 VISION: DYNAMIC ZERO-SHOT AI")
     print("========================================")
 
-    # 1. Read input
+    # 1. Read input payload
     input_data = read_input_json()
     if not input_data:
         return
 
     img_num = input_data.get("img")
-    req_model = input_data.get("model")
+    req_model = input_data.get("model", "light").lower()
 
-    if not img_num or not req_model:
-        print("Invalid input JSON: Missing 'img' or 'model'.")
+    if not img_num:
+        print("Invalid input JSON: Missing 'img'.")
         return
 
-    # Translate "light"/"medium" to file names
-    if req_model == "light":
-        model_name = "yolov8n"
-    elif req_model == "medium":
-        model_name = "yolov8m"
-    else:
-        model_name = "yolov8n" # Default
-
-    # 2. Find Image & Load Model
+    # 2. Find image
     image_path = find_image(img_num)
-    model = load_model(model_name)
-    if not image_path or not model:
+    if not image_path:
         return
+        
+    # 3. Load the specific model requested by Node 2
+    model = load_rover_model(req_model)
 
-    # 3. Run YOLO
+    # 4. Process frame and save telemetry
     detections = run_detection(model, image_path)
     if detections is None:
         return
 
-    # 4. Generate JSON Outputs
     final_output = generate_outputs(detections)
     
     print("\n[SUCCESS] Pipeline Completed.")
