@@ -3,10 +3,15 @@ import json
 import os
 import websockets
 
-NODE3_IP = "172.20.10.13" # Change to actual Node 3 IP
 PORT = 8767
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+IPS_FILE = os.path.abspath(os.path.join(BASE_DIR, "..", "ips.json"))
+
+with open(IPS_FILE, "r") as f:
+    ips = json.load(f)
+NODE3_IP = ips.get("node3", "127.0.0.1")
+
 MY_FILE = os.path.join(BASE_DIR, "outputs", "p2pn1n3Output.json")
 RECEIVED_FILE = os.path.join(BASE_DIR, "inputs", "p2pn1n3Input.json")
 IMAGE_FILE = os.path.join(BASE_DIR, "dataset", "lastFrame.jpg")
@@ -44,7 +49,7 @@ async def receive_data(websocket):
 
 async def main():
     uri = f"ws://{NODE3_IP}:{PORT}"
-    print("Connecting to node3 on 8767...")
+    print(f"Connecting to node3 at {NODE3_IP} on 8767...")
     try:
         async with websockets.connect(uri) as websocket:
             print("Connected to node3!")
