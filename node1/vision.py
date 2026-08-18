@@ -20,7 +20,6 @@ OUTPUT_DIR = os.path.join(BASE_DIR, "outputs")
 # JSON Paths
 INPUT_JSON = os.path.join(INPUT_DIR, "p2pn1n2Input.json")
 OUTPUT_JSON = os.path.join(OUTPUT_DIR, "p2pn1n2Output.json")
-SYS_INFO_JSON = os.path.join(DATASET_DIR, "systemInfo.json")
 
 # Image Paths
 CURRENT_FRAME = os.path.join(OUTPUT_DIR, "currentFrame.jpg")
@@ -52,24 +51,17 @@ def find_image(image_number):
 
 
 def load_rover_model(model_tier):
-    """
-    Loads YOLO-World dynamically based on the requested tier.
-    Both fit easily within an 8GB VRAM GPU.
-    """
-    # 1. Map the JSON request to the specific YOLO-World weights
     if model_tier == "medium":
         model_name = "yolov8m-world.pt"
         print("Model Tier: MEDIUM (yolov8m-world.pt) - Prioritizing Accuracy")
     else:
-        # Default to light
         model_name = "yolov8s-world.pt"
         print("Model Tier: LIGHT (yolov8s-world.pt) - Prioritizing Speed")
 
-    # 2. Load the model (Ultralytics will auto-download it on the first run)
     model = YOLO(model_name)
     
-    # 3. Inject the zero-shot Martian anomaly classes
-    custom_classes = ["rock", "boulder", "crater", "obstacle"]
+    # Expanded prompt set to force matches on Martian surface structures
+    custom_classes = ["rock", "boulder", "stone", "obstacle", "large object", "protrusion"]
     model.set_classes(custom_classes)
     
     print(f"Zero-Shot targets locked: {custom_classes}")
@@ -82,19 +74,37 @@ def run_detection(model, image_path):
         print("Error: Could not read image file.")
         return None
 
-    # Run inference with a lower confidence threshold for zero-shot text matching
-    results = model(img, conf=0.15)
+    # --- ADVANCED MARS EDGE & CONTRAST ENHANCEMENT ---
+    # Converts to LAB color space to separate color from structural lighting shadows
+    lab = cv2.cvtColor(img, cv2.COLOR_BGR2LAB)
+    l, a, b = cv2.split(lab)
+    
+    # Apply aggressive local contrast equalization to make the rock shadow pop
+    clahe = cv2.createCLAHE(clipLimit=4.0, tileGridSize=(4, 4))
+    cl = clahe.apply(l)
+    
+    enhanced_lab = cv2.merge((cl, a, b))
+    processed_img = cv2.cvtColor(enhanced_lab, cv2.COLOR_LAB2BGR)
+    # ------------------------------------------------
+
+    # Ultra-low confidence threshold + low IoU to prevent suppression
+    results = model(processed_img, conf=0.01, iou=0.2)
     
     detections = []
+    img_with_boxes = img.copy()  # Clean raw image for the UI display
     
     for r in results:
-        img_with_boxes = r.plot()
-        
         for box in r.boxes:
-            conf = float(box.conf[0]) * 100
+            conf = round(float(box.conf[0]), 2)
             cls = int(box.cls[0])
             name = model.names[cls]
-            detections.append({"object": name, "confidence": round(conf, 1)})
+            detections.append({"object": name, "confidence": conf})
+            
+            # Draw explicit bounding boxes on the output frame
+            b_coords = box.xyxy[0].tolist()
+            x1, y1, x2, y2 = int(b_coords[0]), int(b_coords[1]), int(b_coords[2]), int(b_coords[3])
+            cv2.rectangle(img_with_boxes, (x1, y1), (x2, y2), (0, 0, 255), 2)
+            cv2.putText(img_with_boxes, f"{name} {conf}", (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
             
     # Handle Image Backups for Node 3 Streamer
     if os.path.exists(CURRENT_FRAME):
@@ -106,10 +116,8 @@ def run_detection(model, image_path):
 
 
 def generate_outputs(detections):
-    # 1. Gather System Hardware Telemetry
+    # Gather System Hardware Telemetry safely
     raw_sys = sysUs.get_system_info()
-    
-    # Safely grab the numbers. If a key isn't found, it defaults to 0.0 so it never crashes.
     cpu_val = raw_sys.get("cpu", raw_sys.get("cpu_usage_percent", 0.0))
     gpu_val = raw_sys.get("gpu", 0.0)
     ram_val = raw_sys.get("ram", raw_sys.get("ram_usage_percent", 0.0))
@@ -122,21 +130,22 @@ def generate_outputs(detections):
         "ram": ram_val,
         "disk": disk_val
     }
-
-    # 2. Write systemInfo.json
-    with open(SYS_INFO_JSON, "w") as f:
-        json.dump(sysus_dict, f, indent=4)
         
-    # 3. Format Top 3 Objects
+    # Format Top 3 Objects (Padding with "nill" and 0.0 if fewer than 3 are detected)
     sorted_dets = sorted(detections, key=lambda x: x['confidence'], reverse=True)
     top_3 = sorted_dets[:3]
     
     objects_dict = {}
-    for i, det in enumerate(top_3, start=1):
-        objects_dict[f"obj{i}"] = det["object"]
-        objects_dict[f"conf{i}"] = det["confidence"]
+    
+    for i in range(1, 4):
+        if i <= len(top_3):
+            objects_dict[f"obj{i}"] = top_3[i-1]["object"]
+            objects_dict[f"conf{i}"] = top_3[i-1]["confidence"]
+        else:
+            objects_dict[f"obj{i}"] = "nill"
+            objects_dict[f"conf{i}"] = 0.0
 
-    # 4. Construct Final Output Payload
+    # Construct Final Output Payload matching Node 2 schema exactly[cite: 1]
     output_json = {
         "from": "node1",
         "to": "node2",
@@ -144,7 +153,6 @@ def generate_outputs(detections):
         "objects": objects_dict
     }
     
-    # Write p2pn1n2Output.json
     with open(OUTPUT_JSON, "w") as f:
         json.dump(output_json, f, indent=4)
         
@@ -153,10 +161,9 @@ def generate_outputs(detections):
 
 def main():
     print("========================================")
-    print("  NODE 1 VISION: DYNAMIC ZERO-SHOT AI")
+    print("  NODE 1 VISION: ENHANCED MARS PIPELINE")
     print("========================================")
 
-    # 1. Read input payload
     input_data = read_input_json()
     if not input_data:
         return
@@ -168,15 +175,11 @@ def main():
         print("Invalid input JSON: Missing 'img'.")
         return
 
-    # 2. Find image
     image_path = find_image(img_num)
     if not image_path:
         return
         
-    # 3. Load the specific model requested by Node 2
     model = load_rover_model(req_model)
-
-    # 4. Process frame and save telemetry
     detections = run_detection(model, image_path)
     if detections is None:
         return
