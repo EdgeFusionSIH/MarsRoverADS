@@ -230,3 +230,4 @@ __marimo__/
 /node2/outputs/
 /node3/outputs/
 .DS_Store
+/weights
