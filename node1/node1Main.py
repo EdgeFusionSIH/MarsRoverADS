@@ -7,6 +7,7 @@ import threading
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 scripts = [
+    "main.py",
     "sysUs.py",
     "vision.py",
     "p2pn1n2.py",
