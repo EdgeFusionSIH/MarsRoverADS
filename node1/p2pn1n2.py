@@ -1,3 +1,5 @@
+#This is the code for the p2p connection between node1 and node2. It sends the data from node1 to node2 and receives the data from node2 to node1.
+
 import asyncio
 import json
 import os
