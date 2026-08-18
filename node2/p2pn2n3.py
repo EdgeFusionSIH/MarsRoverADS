@@ -40,16 +40,18 @@ async def receive_data(websocket):
 
 async def main():
     uri = f"ws://{NODE3_IP}:{PORT}"
-    print(f"Connecting to node3 at {NODE3_IP} on 8766...")
-    try:
-        async with websockets.connect(uri) as websocket:
-            print("Connected to node3!")
-            await asyncio.gather(
-                send_my_file(websocket),
-                receive_data(websocket)
-            )
-    except Exception as e:
-        print(f"Failed to connect to node 3: {e}")
+    while True:
+        print(f"Connecting to node3 at {NODE3_IP} on 8766...")
+        try:
+            async with websockets.connect(uri) as websocket:
+                print("Connected to node3!")
+                await asyncio.gather(
+                    send_my_file(websocket),
+                    receive_data(websocket)
+                )
+        except Exception as e:
+            print(f"Failed to connect to node 3: {e}. Retrying in 3 seconds...")
+        await asyncio.sleep(3)
 
 if __name__ == "__main__":
     asyncio.run(main())
