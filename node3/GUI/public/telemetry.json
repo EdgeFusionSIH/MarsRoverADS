@@ -1,7 +1,6 @@
 {
-  "timestamp": "2026-08-19T05:24:47.000Z",
+  "timestamp": "2026-08-19T06:52:47.000Z",
   "active_model": "YOLOv8n-INT8",
-  "inference_latency_ms": 14.2,
   "complexity_engine": {
     "scheduled_model": "YOLOv8n-INT8",
     "reason": "Model selected: light",
@@ -12,44 +11,44 @@
       "disk_percent": 67.4
     },
     "node2_hardware": {
-      "cpu_percent": 35.9,
+      "cpu_percent": 17.7,
       "vram_percent": 0,
-      "ram_percent": 78.6,
-      "disk_percent": 29.8
+      "ram_percent": 74.7,
+      "disk_percent": 30.2
     }
   },
   "hardware": {
-    "cpu_percent": 35.9,
+    "cpu_percent": 17.7,
     "gpu_percent": 0,
-    "ram_percent": 78.6,
-    "solar_battery_percent": 84.7
+    "ram_percent": 74.7,
+    "solar_battery_percent": 92.98
   },
   "kinematics": {
-    "wheel_slip_percent": 10,
-    "motor_torque_nm": 50,
+    "wheel_slip_percent": 3.58,
+    "motor_torque_nm": 9.77,
     "wheel_slip_history": [
-      10,
-      20,
-      20,
-      20,
-      20,
-      20,
-      20,
-      20,
-      20,
-      20
+      3.48,
+      3.57,
+      3.52,
+      3.81,
+      4.2,
+      4.27,
+      5.07,
+      6.3,
+      5.45,
+      3.58
     ],
     "motor_torque_history": [
-      50,
-      50,
-      50,
-      50,
-      50,
-      50,
-      50,
-      50,
-      50,
-      50
+      10.08,
+      9.75,
+      11.0,
+      9.65,
+      10.83,
+      10.71,
+      9.59,
+      9.71,
+      11.26,
+      9.77
     ]
   },
   "classifying_engine": {
