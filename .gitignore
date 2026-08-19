@@ -257,3 +257,4 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+node3/GUI/public/telemetry.json
