@@ -192,7 +192,7 @@ export default function App() {
       } catch {
         setConnected(false)
       }
-      if (live) timer = setTimeout(poll, 100)
+      if (live) timer = setTimeout(poll, 250)
     }
 
     poll()
