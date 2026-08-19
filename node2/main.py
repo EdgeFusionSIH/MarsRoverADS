@@ -32,9 +32,9 @@ NODE1_OUTPUT   = os.path.join(BASE_DIR, "outputs", "p2pn1n2Output.json")
 def load_csv_segments(path):
     """
     Returns three lists of row-dicts:
-      normal    -> timestamp 0.1–30.0   (rows 1–300)
-      sandstorm -> timestamp 30.1–40.0  (rows 301–401)
-      sandtrap  -> timestamp 40.1–50.0  (rows 402–501)
+      normal    -> timestamp 0.1–50.0 
+      sandstorm -> timestamp 50.1–100.0
+      sandtrap  -> timestamp 100.1–150.0
     """
     normal, sandstorm, sandtrap = [], [], []
     with open(path, newline="", encoding="utf-8-sig") as f:
@@ -48,9 +48,9 @@ def load_csv_segments(path):
                 "torque":     float(row["Torque (%)"]),
                 "solar":      float(row["Solar (%)"])
             }
-            if ts <= 30.0:
+            if ts <= 50.0:
                 normal.append(entry)
-            elif ts <= 40.0:
+            elif ts <= 100.0:
                 sandstorm.append(entry)
             else:
                 sandtrap.append(entry)
@@ -289,4 +289,4 @@ if __name__ == "__main__":
               f"slip={row['wheel_slip']:.1f}%  torque={row['torque']:.1f}%  "
               f"solar={row['solar']:.1f}%  model={model}  cmd={rover_cmd}")
 
-        time.sleep(0.1)  # match CSV 0.1s cadence
+        time.sleep(0.25)  # match CSV 0.25s cadence
