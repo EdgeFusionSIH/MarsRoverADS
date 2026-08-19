@@ -3,8 +3,45 @@ import os
 import sys
 import time
 import threading
+import socket
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# Ports used by the p2p websocket servers
+WS_PORTS = [8766, 8767]
+
+def kill_stale_port(port):
+    """Kill any process still holding a port from a previous run."""
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.settimeout(1)
+        result = s.connect_ex(("127.0.0.1", port))
+        s.close()
+        if result == 0:  # port is in use
+            print(f"[cleanup] Port {port} is occupied, killing old process...")
+            if sys.platform == "win32":
+                # Find and kill the PID holding the port on Windows
+                out = subprocess.check_output(
+                    f"netstat -ano | findstr :{port}", shell=True, text=True
+                )
+                for line in out.strip().splitlines():
+                    parts = line.split()
+                    if f":{port}" in parts[1] and parts[3] == "LISTENING":
+                        pid = parts[-1]
+                        subprocess.run(f"taskkill /F /PID {pid}", shell=True,
+                                       capture_output=True)
+                        print(f"[cleanup] Killed PID {pid} on port {port}")
+                        break
+            else:
+                subprocess.run(f"lsof -ti :{port} | xargs kill -9", shell=True,
+                               capture_output=True)
+                print(f"[cleanup] Killed process on port {port}")
+            time.sleep(0.5)
+    except Exception:
+        pass  # port is free, nothing to do
+
+for port in WS_PORTS:
+    kill_stale_port(port)
 
 scripts = [
     "p2pn2n3.py",
@@ -62,4 +99,7 @@ try:
 except KeyboardInterrupt:
     print("\nShutting down Node 3 processes...")
     for p in processes:
-        p.terminate()
+        p.kill()  # kill() is more reliable than terminate() on Windows
+    for p in processes:
+        p.wait()  # wait for them to actually exit
+    print("All processes stopped.")

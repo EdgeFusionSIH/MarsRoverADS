@@ -231,4 +231,12 @@ __marimo__/
 /node3/outputs/
 .DS_Store
 /weights
+<<<<<<< Updated upstream
 node3/GUI/public/telemetry.json
+=======
+node_modules/
+
+# Runtime GUI outputs (written by guiBackend.py, polled by frontend)
+**/GUI/public/telemetry.json
+**/GUI/public/last_frame.jpg
+>>>>>>> Stashed changes
