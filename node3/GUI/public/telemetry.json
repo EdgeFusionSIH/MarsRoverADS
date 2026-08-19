@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-08-18T20:52:58.000Z",
+  "timestamp": "2026-08-19T04:50:34.000Z",
   "active_model": "YOLOv8n-INT8",
   "inference_latency_ms": 14.2,
   "complexity_engine": {
@@ -12,45 +12,19 @@
       "disk_percent": 67.4
     },
     "node2_hardware": {
-      "cpu_percent": 16.9,
+      "cpu_percent": 34.8,
       "vram_percent": 0,
-      "ram_percent": 76.8,
+      "ram_percent": 77.6,
       "disk_percent": 30.2
     }
   },
   "hardware": {
-    "cpu_percent": 16.9,
+    "cpu_percent": 34.8,
     "gpu_percent": 0,
-    "ram_percent": 76.8,
+    "ram_percent": 77.6,
     "solar_battery_percent": 84.7
   },
   "kinematics": {
-    "wheel_slip_percent": 10,
-    "motor_torque_nm": 50,
-    "wheel_slip_history": [
-      10,
-      20,
-      20,
-      20,
-      20,
-      20,
-      20,
-      20,
-      20,
-      20
-    ],
-    "motor_torque_history": [
-      50,
-      50,
-      50,
-      50,
-      50,
-      50,
-      50,
-      50,
-      50,
-      50
-    ]
     "wheel_slip_percent": 10,
     "motor_torque_nm": 50,
     "wheel_slip_history": [
@@ -84,22 +58,15 @@
     "fusion_output": "NOMINAL \u2014 No Fusion Conflict",
     "fusion_confidence": 0.85,
     "rover_command": "NOMINAL"
-    "vision_classification": "Nominal",
-    "telemetry_classification": "Normal Torque",
-    "fusion_output": "NOMINAL \u2014 No Fusion Conflict",
-    "fusion_confidence": 0.85,
-    "rover_command": "NOMINAL"
   },
   "documentation_engine": {
     "sync_status": "BUFFERING OFFLINE",
     "earth_signal_delay_sec": 1124,
     "logs": []
-    "logs": []
   },
   "chaos_bench": {
     "dust_storm_active": false,
     "sand_trap_injected": false,
-    "earth_uplink_enabled": false
     "earth_uplink_enabled": false
   }
 }
