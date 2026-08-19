@@ -102,9 +102,9 @@ def select_model(node1_hw, node2_hw, dust_storm, solar_pct):
     cpu2 = node2_hw.get("cpu", 0)
     ram2 = node2_hw.get("ram", 0)
 
-    both_low = cpu1 < 70 and ram1 < 80 and cpu2 < 70 and ram2 < 80
+    both_low = cpu1 < 85 and ram1 < 90 and cpu2 < 85 and ram2 < 90
     if both_low:
-        return "medium", "Nodes healthy — medium model selected"
+        return "medium", "Nodes healthy — normal model selected"
     return "light", "High load detected — light model selected"
 
 

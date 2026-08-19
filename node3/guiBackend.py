@@ -61,12 +61,12 @@ def build_telemetry():
     torque_history = [kt.get(f"torque{i}", 0) for i in range(9, -1, -1)]
 
     # Model info
-    model = n2n3.get("model", "light")
+    model = n2n3.get("model", "medium")
     model_map = {
         "light": "YOLOv8n-INT8",
-        "medium": "YOLO-medium"
+        "medium": "YOLOv8n-FP16"
     }
-    active_model = model_map.get(model, "YOLOv8n-INT8")
+    active_model = model_map.get(model, "YOLOv8n-FP16")
 
     # Sensor data from CSV (sent by node2's core engine)
     sensor = n2n3.get("sensor", {})
@@ -87,6 +87,28 @@ def build_telemetry():
         model_reason = "DUST STORM — Emergency power conservation"
     elif segment == "SAND_TRAP":
         model_reason = "SAND TRAP — Erratic terrain detected"
+
+    # Read recent logs for the flight recorder
+    logs = []
+    log_path = os.path.join(BASE_DIR, "outputs", "node3_console.log")
+    if os.path.exists(log_path):
+        try:
+            with open(log_path, "r", encoding="utf-8") as f:
+                lines = f.readlines()
+                for line in lines[-30:]:  # take last 30 lines
+                    line = line.strip()
+                    if not line: continue
+                    parts = line.split(" ", 1)
+                    if len(parts) == 2:
+                        t_str, msg = parts
+                        level = "INFO"
+                        m_upper = msg.upper()
+                        if "WARN" in m_upper: level = "WARN"
+                        elif "ERR" in m_upper or "TRACE" in m_upper: level = "ERROR"
+                        elif "CRIT" in m_upper: level = "CRIT"
+                        logs.append({"time": t_str, "level": level, "msg": msg})
+        except Exception:
+            pass
 
     telemetry = {
         "timestamp": time.strftime("%Y-%m-%dT%H:%M:%S.000Z", time.gmtime()),
@@ -129,7 +151,7 @@ def build_telemetry():
         "documentation_engine": {
             "sync_status": "BUFFERING OFFLINE",
             "earth_signal_delay_sec": 1124,
-            "logs": []
+            "logs": logs
         },
         "chaos_bench": {
             "dust_storm_active": chaos.get("duststorm", 0) == 1,

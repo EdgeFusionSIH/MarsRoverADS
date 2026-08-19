@@ -49,12 +49,23 @@ scripts = [
     "guiBackend.py"
 ]
 
+LOG_FILE = os.path.join(BASE_DIR, "outputs", "node3_console.log")
+os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
+with open(LOG_FILE, "w") as f:
+    f.write("")  # clear previous logs
+
 def print_output(process, prefix):
     for line in iter(process.stdout.readline, b''):
         line = line.decode('utf-8', errors='replace').rstrip()
         if line:
-            print(f"[{prefix}] {line}")
+            msg = f"[{prefix}] {line}"
+            print(msg)
             sys.stdout.flush()
+            try:
+                with open(LOG_FILE, "a", encoding='utf-8') as f:
+                    f.write(f"{time.strftime('%H:%M:%S')} {msg}\n")
+            except Exception:
+                pass
 
 processes = []
 print("Starting Node 3 processes...")
