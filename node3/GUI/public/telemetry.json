@@ -1,9 +1,5 @@
 {
-<<<<<<< Updated upstream
-  "timestamp": "2026-08-19T04:50:34.000Z",
-=======
-  "timestamp": "2026-08-18T20:51:39.000Z",
->>>>>>> Stashed changes
+  "timestamp": "2026-08-19T05:24:47.000Z",
   "active_model": "YOLOv8n-INT8",
   "inference_latency_ms": 14.2,
   "complexity_engine": {
@@ -16,16 +12,16 @@
       "disk_percent": 67.4
     },
     "node2_hardware": {
-      "cpu_percent": 34.8,
+      "cpu_percent": 35.9,
       "vram_percent": 0,
-      "ram_percent": 77.6,
-      "disk_percent": 30.2
+      "ram_percent": 78.6,
+      "disk_percent": 29.8
     }
   },
   "hardware": {
-    "cpu_percent": 34.8,
+    "cpu_percent": 35.9,
     "gpu_percent": 0,
-    "ram_percent": 77.6,
+    "ram_percent": 78.6,
     "solar_battery_percent": 84.7
   },
   "kinematics": {
