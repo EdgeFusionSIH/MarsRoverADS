@@ -2,13 +2,16 @@
 Node 3 GUI Backend
 Reads P2P input JSONs + lastFrame.jpg from node3/inputs/
 Writes telemetry.json + last_frame.jpg into node3/GUI/public/
-Also serves Chaos Bench buttons by writing node3/outputs/p2pn2n3Output.json
+Also serves Chaos Bench buttons via a small HTTP API on port 5001
+that writes node3/outputs/p2pn2n3Output.json
 """
 
 import json
 import os
 import shutil
 import time
+import threading
+from http.server import HTTPServer, BaseHTTPRequestHandler
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -22,8 +25,10 @@ GUI_PUBLIC = os.path.join(BASE_DIR, "GUI", "public")
 TELEMETRY_OUT = os.path.join(GUI_PUBLIC, "telemetry.json")
 LAST_FRAME_OUT = os.path.join(GUI_PUBLIC, "last_frame.jpg")
 
-# Chaos output
+# Chaos output (this file is sent to Node 2 via p2p websocket)
 CHAOS_OUTPUT = os.path.join(BASE_DIR, "outputs", "p2pn2n3Output.json")
+
+CHAOS_API_PORT = 5001
 
 def read_json_safe(path):
     try:
@@ -50,14 +55,16 @@ def build_telemetry():
 
     # Extract kinematics from node2->node3 data
     kt = n2n3.get("kt", {})
-    slip_history = [kt.get(f"wheelslip{i}", 0) for i in range(10)]
-    torque_history = [kt.get(f"torque{i}", 0) for i in range(10)]
+    # kt has wheelslip0=newest ... wheelslip9=oldest
+    # Graph expects index 0=oldest, index 9=newest, so reverse
+    slip_history = [kt.get(f"wheelslip{i}", 0) for i in range(9, -1, -1)]
+    torque_history = [kt.get(f"torque{i}", 0) for i in range(9, -1, -1)]
 
     # Model info
     model = n2n3.get("model", "light")
     model_map = {
         "light": "YOLOv8n-INT8",
-        "medium": "YOLOv8s-FP16"
+        "medium": "YOLO-medium"
     }
     active_model = model_map.get(model, "YOLOv8n-INT8")
 
@@ -84,7 +91,6 @@ def build_telemetry():
     telemetry = {
         "timestamp": time.strftime("%Y-%m-%dT%H:%M:%S.000Z", time.gmtime()),
         "active_model": active_model,
-        "inference_latency_ms": 14.2,
         "complexity_engine": {
             "scheduled_model": active_model,
             "reason": model_reason,
@@ -108,8 +114,8 @@ def build_telemetry():
             "solar_battery_percent": solar_pct
         },
         "kinematics": {
-            "wheel_slip_percent": slip_history[0] if slip_history else 0,
-            "motor_torque_nm": torque_history[0] if torque_history else 0,
+            "wheel_slip_percent": slip_history[-1] if slip_history else 0,
+            "motor_torque_nm": torque_history[-1] if torque_history else 0,
             "wheel_slip_history": slip_history,
             "motor_torque_history": torque_history
         },
@@ -141,8 +147,79 @@ def copy_last_frame():
     except Exception as e:
         print(f"Image copy error: {e}")
 
+
+# ── Chaos Bench HTTP API ──────────────────────────────────
+class ChaosHandler(BaseHTTPRequestHandler):
+    """Handles POST /api/chaos from the GUI to toggle chaos bench flags."""
+
+    def do_POST(self):
+        if self.path == "/api/chaos":
+            try:
+                length = int(self.headers.get("Content-Length", 0))
+                body = json.loads(self.rfile.read(length))
+
+                chaos_data = {
+                    "from": "node3",
+                    "to": "node2",
+                    "duststorm": body.get("duststorm", 0),
+                    "sandtrap": body.get("sandtrap", 0),
+                    "earthuplink": body.get("earthuplink", 0)
+                }
+
+                os.makedirs(os.path.dirname(CHAOS_OUTPUT), exist_ok=True)
+                with open(CHAOS_OUTPUT, "w") as f:
+                    json.dump(chaos_data, f, indent=4)
+
+                print(f"[Chaos API] Updated: storm={chaos_data['duststorm']} "
+                      f"trap={chaos_data['sandtrap']} uplink={chaos_data['earthuplink']}")
+
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Access-Control-Allow-Origin", "*")
+                self.end_headers()
+                self.wfile.write(json.dumps({"ok": True}).encode())
+            except Exception as e:
+                self.send_response(500)
+                self.end_headers()
+                self.wfile.write(str(e).encode())
+        else:
+            self.send_response(404)
+            self.end_headers()
+
+    def do_OPTIONS(self):
+        """Handle CORS preflight for the POST."""
+        self.send_response(204)
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Methods", "POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.end_headers()
+
+    def log_message(self, format, *args):
+        pass  # suppress default HTTP logging
+
+
+def start_chaos_api():
+    """Run the chaos API server in a background thread."""
+    server = HTTPServer(("0.0.0.0", CHAOS_API_PORT), ChaosHandler)
+    print(f"[Chaos API] Listening on port {CHAOS_API_PORT}")
+    server.serve_forever()
+
+
+# ── Main loop ─────────────────────────────────────────────
 def update_loop():
     os.makedirs(GUI_PUBLIC, exist_ok=True)
+
+    # Ensure chaos output file exists with defaults
+    if not os.path.exists(CHAOS_OUTPUT):
+        os.makedirs(os.path.dirname(CHAOS_OUTPUT), exist_ok=True)
+        with open(CHAOS_OUTPUT, "w") as f:
+            json.dump({"from": "node3", "to": "node2",
+                       "duststorm": 0, "sandtrap": 0, "earthuplink": 0}, f, indent=4)
+
+    # Start chaos API server in background
+    api_thread = threading.Thread(target=start_chaos_api, daemon=True)
+    api_thread.start()
+
     print("Starting Node 3 GUI backend...")
 
     while True:

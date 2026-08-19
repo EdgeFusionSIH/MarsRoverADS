@@ -85,14 +85,17 @@ def read_chaos():
 
 
 # ── Complexity Engine ──────────────────────────────────────
-def select_model(node1_hw, node2_hw, dust_storm):
+def select_model(node1_hw, node2_hw, dust_storm, solar_pct):
     """
-    Pick YOLO model based on hardware load & chaos state.
-    Dust storm → always light (power conservation).
-    Otherwise use 'medium' if both nodes have headroom.
+    Pick YOLO model based on hardware load, solar power & chaos state.
+    Dust storm or low solar → always light (power conservation).
+    Otherwise use 'medium' if both nodes have headroom and solar is healthy.
     """
     if dust_storm:
         return "light", "DUST STORM — Emergency power conservation"
+
+    if solar_pct < 70:
+        return "light", f"Low solar ({solar_pct:.0f}%) — light model for power savings"
 
     cpu1 = node1_hw.get("cpu", 0)
     ram1 = node1_hw.get("ram", 0)
@@ -220,7 +223,7 @@ if __name__ == "__main__":
         node2_hw = read_node2_sysus()
 
         # ── Complexity Engine — model selection ──
-        model, model_reason = select_model(node1_hw, node2_hw, dust_storm)
+        model, model_reason = select_model(node1_hw, node2_hw, dust_storm, row["solar"])
 
         # ── Classifying Engine / Fusion Brain ──
         (vision_cls, telem_cls,

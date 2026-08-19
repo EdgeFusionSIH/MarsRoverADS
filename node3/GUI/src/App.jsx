@@ -105,7 +105,7 @@ function Gauge({ value, label, color, warning }) {
 /* ═══════════════════════════════════════════
    NODE HEALTH CARD (used inside Complexity Engine)
    ═══════════════════════════════════════════ */
-function NodeHealthCard({ title, hw }) {
+function NodeHealthCard({ title, hw, solar }) {
   return (
     <div className="node-health-card">
       <div className="node-health-title">{title}</div>
@@ -114,6 +114,9 @@ function NodeHealthCard({ title, hw }) {
         <Gauge value={hw.vram_percent || 0} label="VRAM" color="var(--emerald)" />
         <Gauge value={hw.ram_percent || 0} label="RAM" color="var(--amber)" />
         <Gauge value={hw.disk_percent || 0} label="DISK" color="var(--cyan-dim)" />
+        {solar !== undefined && (
+          <Gauge value={solar} label="SOLAR" color="var(--amber)" warning={solar < 60} />
+        )}
       </div>
     </div>
   )
@@ -264,7 +267,6 @@ export default function App() {
             <div className="scan-overlay" />
             <div className="navcam-overlay">
               <span className="overlay-model">{telemetry?.active_model || '—'}</span>
-              <span className="overlay-latency">{telemetry ? `${telemetry.inference_latency_ms} ms` : '—'}</span>
             </div>
           </div>
         </div>
@@ -301,7 +303,7 @@ export default function App() {
           </div>
           <div className="panel-body">
             <div className="node-health-split">
-              <NodeHealthCard title="NODE 1 — VISION" hw={node1Hw} />
+              <NodeHealthCard title="NODE 1 — VISION" hw={node1Hw} solar={hw.solar_battery_percent} />
               <NodeHealthCard title="NODE 2 — CONTROL" hw={node2Hw} />
             </div>
             <div className="scheduled-model">
