@@ -176,23 +176,10 @@ export default function App() {
         if (!r.ok) throw new Error()
         const d = await r.json()
 
-        if (chaosStorm) {
-          d.hardware.solar_battery_percent = 12.3
-          d.complexity_engine.scheduled_model = 'YOLOv8n-INT8'
-          d.complexity_engine.reason = 'DUST STORM — Emergency power conservation'
-          d.active_model = 'YOLOv8n-INT8'
-        }
-        if (chaosSand) {
-          d.kinematics.wheel_slip_percent = 45.2
-          d.kinematics.wheel_slip_history = d.kinematics.wheel_slip_history.map(() => 30 + Math.random() * 20)
-          d.kinematics.motor_torque_nm = 8.9
-          d.kinematics.motor_torque_history = d.kinematics.motor_torque_history.map(() => 6 + Math.random() * 3)
-          d.classifying_engine.vision_classification = 'Loose Sand'
-          d.classifying_engine.telemetry_classification = 'High Torque'
-          d.classifying_engine.fusion_output = 'CRITICAL: Traction Loss Imminent'
-          d.classifying_engine.fusion_confidence = 0.97
-          d.classifying_engine.rover_command = 'HALT'
-        }
+        // Chaos-driven data is now produced by node2's core engine
+        // via the real CSV, so we just pass it through.
+        // Only the earth uplink toggle still needs a client-side override
+        // since it controls the documentation_engine sync status display.
         if (chaosUplink) {
           d.documentation_engine.sync_status = 'SYNCING TO EARTH'
         }
@@ -207,7 +194,7 @@ export default function App() {
 
     poll()
     return () => { live = false; clearTimeout(timer) }
-  }, [chaosStorm, chaosSand, chaosUplink])
+  }, [chaosUplink])
 
   /* Image preload — flicker-free */
   useEffect(() => {
@@ -240,7 +227,7 @@ export default function App() {
   const node1Hw = ce.node1_hardware || {}
   const node2Hw = ce.node2_hardware || {}
 
-  const isCritical = cls.vision_classification === 'Loose Sand' && cls.telemetry_classification === 'High Torque'
+  const isCritical = cls.rover_command === 'HALT' || cls.rover_command === 'SAFE_MODE' || (cls.fusion_output || '').includes('CRITICAL')
   const syncOffline = (doc.sync_status || '').toUpperCase().includes('OFFLINE') || (doc.sync_status || '').toUpperCase().includes('BUFFER')
 
   return (
@@ -352,11 +339,11 @@ export default function App() {
 
             {isCritical ? (
               <div className="fusion-alert critical">
-                ⚠ CRITICAL: Traction Loss Imminent — Commanding Rover Halt
+                ⚠ {cls.fusion_output || 'CRITICAL'}
               </div>
             ) : (
               <div className="fusion-alert nominal">
-                NOMINAL — No Fusion Conflict Detected
+                {cls.fusion_output || 'NOMINAL — No Fusion Conflict Detected'}
               </div>
             )}
 

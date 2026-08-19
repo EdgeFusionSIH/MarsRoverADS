@@ -111,36 +111,35 @@
     "to": "node3", //reciever
     "sysus": //data from the systemInfo.json (written by the main.py)
     {
-        "nodeid": 2, //Which node are we working with
-        "cpu": 5.0, //util% for all parameters
-        "gpu": 0,
-        "ram": 73.7,
-        "disk": 66.2
+        "node1": { ... }, //Node 1 hardware info
+        "node2": { ... }  //Node 2 hardware info
     },
-    "model": "light", //written by main.py
-    "kt": //kinematic telemetry written by main.py
+    "model": "light", //written by main.py complexity engine
+    "kt": //kinematic telemetry written by main.py from CSV
     {
         "wheelslip0": 10, //current wheel slip percentage
         "torque0": 50, //current torque percentage
         "wheelslip1": 20, //-1 frame wheel slip percentage
         "torque1": 50, //-1 frame wheel torque percentage
-        "wheelslip2": 20, //-2 frame wheel slip percentage
-        "torque2": 50, //-2 frame wheel torque percentage
-        "wheelslip3": 20, //-3 frame wheel slip percentage
-        "torque3": 50, //-3 frame wheel torque percentage
-        "wheelslip4": 20, //-4 frame wheel slip percentage
-        "torque4": 50, //-4 frame wheel torque percentage
-        "wheelslip5": 20, //-5 frame wheel slip percentage
-        "torque5": 50, //-5 frame wheel torque percentage
-        "wheelslip6": 20, //-6 frame wheel slip percentage
-        "torque6": 50, //-6 frame wheel torque percentage
-        "wheelslip7": 20, //-7 frame wheel slip percentage
-        "torque7": 50, //-7 frame wheel torque percentage
-        "wheelslip8": 20, //-8 frame wheel slip percentage
-        "torque8": 50, //-8 frame wheel torque percentage
-        "wheelslip9": 20, //-9 frame wheel slip percentage
-        "torque9": 50, //-9 frame wheel torque percentage
+        ... //up to wheelslip9/torque9
     },
+    "sensor": //raw CSV row from mars_rover_sensor_data.csv
+    {
+        "timestamp": 5.3, //CSV timestamp in seconds
+        "image_num": 53, //corresponding image number
+        "wheel_slip": 5.87, //wheel slip %
+        "torque": 10.38, //motor torque %
+        "solar": 93.21, //solar battery %
+        "segment": "NORMAL" //"NORMAL", "DUST_STORM", or "SAND_TRAP"
+    },
+    "classifying": //fusion brain output from main.py classifying engine
+    {
+        "vision_classification": "Nominal", //"Nominal", "Moderate Terrain", "Loose Surface", "Loose Sand", "Reduced Visibility"
+        "telemetry_classification": "Normal Torque", //"Normal Torque", "Elevated Torque", "High Torque", "Erratic Torque", "Solar Degraded"
+        "fusion_output": "NOMINAL — No Fusion Conflict", //fusion decision string
+        "fusion_confidence": 0.85, //0.0 to 1.0
+        "rover_command": "NOMINAL" //"NOMINAL", "SLOW", "HALT", "SAFE_MODE"
+    }
 }
 
 ## NODE 3

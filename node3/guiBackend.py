@@ -61,13 +61,33 @@ def build_telemetry():
     }
     active_model = model_map.get(model, "YOLOv8n-INT8")
 
+    # Sensor data from CSV (sent by node2's core engine)
+    sensor = n2n3.get("sensor", {})
+    solar_pct = sensor.get("solar", 84.7)
+
+    # Classifying engine / fusion brain output from node2
+    cls_data = n2n3.get("classifying", {})
+    vision_cls   = cls_data.get("vision_classification", "Nominal")
+    telem_cls    = cls_data.get("telemetry_classification", "Normal Torque")
+    fusion_out   = cls_data.get("fusion_output", "NOMINAL — No Fusion Conflict")
+    fusion_conf  = cls_data.get("fusion_confidence", 0.85)
+    rover_cmd    = cls_data.get("rover_command", "NOMINAL")
+
+    # Model reason from complexity engine
+    model_reason = f"Model selected: {model}"
+    segment = sensor.get("segment", "NORMAL")
+    if segment == "DUST_STORM":
+        model_reason = "DUST STORM — Emergency power conservation"
+    elif segment == "SAND_TRAP":
+        model_reason = "SAND TRAP — Erratic terrain detected"
+
     telemetry = {
         "timestamp": time.strftime("%Y-%m-%dT%H:%M:%S.000Z", time.gmtime()),
         "active_model": active_model,
         "inference_latency_ms": 14.2,
         "complexity_engine": {
             "scheduled_model": active_model,
-            "reason": f"Model selected: {model}",
+            "reason": model_reason,
             "node1_hardware": {
                 "cpu_percent": node1_hw.get("cpu", 0),
                 "vram_percent": node1_hw.get("vram", 0),
@@ -85,7 +105,7 @@ def build_telemetry():
             "cpu_percent": node2_hw.get("cpu", 0),
             "gpu_percent": node2_hw.get("vram", 0),
             "ram_percent": node2_hw.get("ram", 0),
-            "solar_battery_percent": 84.7
+            "solar_battery_percent": solar_pct
         },
         "kinematics": {
             "wheel_slip_percent": slip_history[0] if slip_history else 0,
@@ -94,11 +114,11 @@ def build_telemetry():
             "motor_torque_history": torque_history
         },
         "classifying_engine": {
-            "vision_classification": "Nominal",
-            "telemetry_classification": "Normal Torque",
-            "fusion_output": "NOMINAL — No Fusion Conflict",
-            "fusion_confidence": 0.85,
-            "rover_command": "NOMINAL"
+            "vision_classification": vision_cls,
+            "telemetry_classification": telem_cls,
+            "fusion_output": fusion_out,
+            "fusion_confidence": fusion_conf,
+            "rover_command": rover_cmd
         },
         "documentation_engine": {
             "sync_status": "BUFFERING OFFLINE",
