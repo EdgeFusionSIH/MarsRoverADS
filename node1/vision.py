@@ -1,18 +1,25 @@
 import json
 import os
 import shutil
+import traceback
 import cv2
+import torch
 import psutil
 from PIL import Image
-
-# The magic library that runs Google's Zero-Shot AI
-from transformers import pipeline 
-
-# Import your system usage module
-import sysUs
+from transformers import pipeline
 
 # ============================================================
-# PATHS
+# SAFE TELEMETRY IMPORT
+# ============================================================
+try:
+    import sysUs
+    SYSUS_AVAILABLE = True
+except ImportError:
+    SYSUS_AVAILABLE = False
+    print("[SYSTEM] Warning: sysUs.py not found or broken. Using default telemetry values.")
+
+# ============================================================
+# DIRECTORY SETUP (Bulletproof Paths)
 # ============================================================
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATASET_DIR = os.path.join(BASE_DIR, "dataset")
@@ -28,90 +35,111 @@ os.makedirs(OUTPUT_DIR, exist_ok=True)
 os.makedirs(DATASET_DIR, exist_ok=True)
 os.makedirs(INPUT_DIR, exist_ok=True)
 
+# ============================================================
+# CORE FUNCTIONS
+# ============================================================
+def get_device():
+    """Detects your RTX 5050 to force GPU acceleration."""
+    if torch.cuda.is_available():
+        print(f"[SYSTEM] Hardware Acceleration Enabled: {torch.cuda.get_device_name(0)}")
+        return 0 
+    else:
+        print("[SYSTEM] Warning: CUDA not found, falling back to CPU.")
+        return -1
 
-def read_input_json():
-    if not os.path.exists(INPUT_JSON): return None
-    with open(INPUT_JSON, "r") as f: return json.load(f)
-
-
-def find_image(image_number):
-    img_path = os.path.join(DATASET_DIR, f"img{image_number}.jpg")
-    return img_path if os.path.exists(img_path) else None
-
-
-def load_rover_model():
-    print("Loading Google OWL-ViT (Zero-Shot Space AI)...")
-    # This downloads the model to your cache once, then runs 100% offline.
-    # No 'git' or 'clip' dependencies required.
-    detector = pipeline(
+def load_ai_model():
+    """Loads Google's Zero-Shot Vision Transformer."""
+    print("[AI] Loading OWL-ViT (Zero-Shot Space Vision)...")
+    return pipeline(
         task="zero-shot-object-detection",
-        model="google/owlvit-base-patch32"
+        model="google/owlvit-base-patch32",
+        device=get_device()
     )
-    return detector
 
-
-def run_detection(detector, image_path, model_tier):
+def run_vision_scan(detector, image_path, tier):
+    """Scans the image based on the JSON tier requirements."""
+    print(f"\n[VISION] Processing image: {image_path}")
+    
     img_cv = cv2.imread(image_path)
-    if img_cv is None: return None
-
+    if img_cv is None:
+        raise ValueError(f"OpenCV could not read the image at {image_path}. File might be corrupted.")
+    
     img_pil = Image.open(image_path).convert("RGB")
     
-    # --- DYNAMIC TIER SWITCHING ---
-    if model_tier == "medium":
-        print("--> Configured for MEDIUM: Deep Scan (5 targets, High Sensitivity)")
-        mars_targets = ["boulder", "rock", "crater", "crease", "surface crack"]
-        conf_threshold = 0.04
+    # ---------------------------------------------------------
+    # TIER SYSTEM: Changes targets and strictness based on JSON
+    # ---------------------------------------------------------
+    if tier == "medium":
+        print("[VISION] Tier: MEDIUM -> Deep Scan (High GPU usage)")
+        targets = ["boulder", "rock", "crater", "surface crack", "sand dune", "crevasse"]
+        threshold = 0.05
     else:
-        print("--> Configured for LIGHT: Fast Scan (2 targets, Low Compute)")
-        mars_targets = ["boulder", "crater"]
-        conf_threshold = 0.08
-        
-    print(f"Scanning terrain for: {mars_targets}")
-    predictions = detector(
-        img_pil,
-        candidate_labels=mars_targets
-    )
+        print("[VISION] Tier: LIGHT -> Fast Scan (Low GPU usage)")
+        targets = ["boulder", "crater", "rock"]
+        threshold = 0.08
+
+    print(f"[VISION] Hunting for: {targets}")
     
-    detections = []
-    img_with_boxes = img_cv.copy()
+    predictions = detector(img_pil, candidate_labels=targets)
+    raw_detections = []
     
     for pred in predictions:
-        conf = round(pred['score'], 2)
-        
-        # Applies the threshold based on the requested tier
-        if conf < conf_threshold: 
-            continue
+        conf = pred['score']
+        if conf >= threshold:
+            raw_detections.append({
+                "object": pred['label'],
+                "confidence": round(conf, 2),
+                "box": pred['box']
+            })
             
-        name = pred['label']
-        box = pred['box']
-        
-        detections.append({"object": name, "confidence": conf})
+    # SORT AND EXTRACT STRICTLY TOP 3
+    raw_detections = sorted(raw_detections, key=lambda x: x['confidence'], reverse=True)
+    top_3 = raw_detections[:3]
+    
+    # Draw boxes
+    img_with_boxes = img_cv.copy()
+    for det in top_3:
+        box = det['box']
+        name = det['object']
+        conf = det['confidence']
         
         x1, y1, x2, y2 = int(box['xmin']), int(box['ymin']), int(box['xmax']), int(box['ymax'])
-        
         cv2.rectangle(img_with_boxes, (x1, y1), (x2, y2), (0, 165, 255), 2)
         cv2.putText(img_with_boxes, f"{name} {conf}", (x1, y1 - 10), 
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 165, 255), 2)
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 165, 255), 2)
 
+    # Output management
     if os.path.exists(CURRENT_FRAME):
         shutil.move(CURRENT_FRAME, LAST_FRAME)
-        
     cv2.imwrite(CURRENT_FRAME, img_with_boxes)
-    return detections
+    
+    return top_3
 
+def generate_output_payload(top_3):
+    """Builds the JSON payload for Node 2."""
+    print("\n[SYSTEM] Gathering Telemetry & Building JSON...")
+    
+    cpu_val = gpu_val = ram_val = 0.0
+    
+    # Safely pull from custom telemetry script if it exists
+    if SYSUS_AVAILABLE:
+        try:
+            raw_sys = sysUs.get_system_info()
+            cpu_val = raw_sys.get("cpu", raw_sys.get("cpu_usage_percent", 0.0))
+            gpu_val = raw_sys.get("gpu", 0.0)
+            ram_val = raw_sys.get("ram", raw_sys.get("ram_usage_percent", 0.0))
+        except Exception as e:
+            print(f"[SYSTEM] Warning: sysUs telemetry execution failed ({e}).")
 
-def generate_outputs(detections):
-    raw_sys = sysUs.get_system_info()
+    # Fixed the disk pathing issue for Windows compatibility 
+    drive_path = os.path.abspath(os.sep)
     sysus_dict = {
         "nodeid": 1,
-        "cpu": raw_sys.get("cpu", raw_sys.get("cpu_usage_percent", 0.0)),
-        "gpu": raw_sys.get("gpu", 0.0),
-        "ram": raw_sys.get("ram", raw_sys.get("ram_usage_percent", 0.0)),
-        "disk": round(psutil.disk_usage('/').percent, 1)
+        "cpu": cpu_val,
+        "gpu": gpu_val,
+        "ram": ram_val,
+        "disk": round(psutil.disk_usage(drive_path).percent, 1)
     }
-        
-    sorted_dets = sorted(detections, key=lambda x: x['confidence'], reverse=True)
-    top_3 = sorted_dets[:3]
     
     objects_dict = {}
     for i in range(1, 4):
@@ -134,48 +162,51 @@ def generate_outputs(detections):
         
     return output_json
 
-
+# ============================================================
+# MAIN EXECUTION ROUTINE
+# ============================================================
 def main():
     print("========================================")
-    print("  NODE 1 VISION: ZERO-SHOT PIPELINE")
+    print("  NODE 1 VISION: MARTIAN SURFACE PIPELINE")
     print("========================================")
 
-    print("[DEBUG] Reading input JSON...")
-    input_data = read_input_json()
-    if not input_data:
-        print("[ERROR] read_input_json() returned None or empty!")
-        return
-    print(f"[DEBUG] Input data loaded: {input_data}")
-
-    img_num = input_data.get("img")
-    req_model = input_data.get("model", "light").lower()
-    
-    if not img_num:
-        print("[ERROR] 'img' key missing from input JSON!")
-        return
-
-    print(f"[DEBUG] Looking for image number: {img_num}")
-    image_path = find_image(img_num)
-    if not image_path:
-        print(f"[ERROR] find_image() could not locate image for id '{img_num}' in dataset folder!")
-        return
-    print(f"[DEBUG] Found image at: {image_path}")
+    try:
+        # 1. Read JSON safely
+        if not os.path.exists(INPUT_JSON):
+            raise FileNotFoundError(f"Missing input JSON at {INPUT_JSON}")
+            
+        with open(INPUT_JSON, "r") as f:
+            input_data = json.load(f)
+            
+        img_num = input_data.get("img")
+        tier = input_data.get("model", "light").lower()
         
-    print("[DEBUG] Loading OWL-ViT model...")
-    detector = load_rover_model()
-    
-    print("[DEBUG] Running detection...")
-    detections = run_detection(detector, image_path, req_model)
-    if detections is None:
-        print("[ERROR] run_detection() failed or returned None!")
-        return
-    print(f"[DEBUG] Detections found: {detections}")
+        if not img_num:
+            raise ValueError("Input JSON is missing the 'img' key.")
 
-    print("[DEBUG] Generating output JSON...")
-    final_output = generate_outputs(detections)
-    
-    print("\n[SUCCESS] Pipeline Completed.")
-    print(f"Data saved to {OUTPUT_JSON}:\n")
-    print(json.dumps(final_output, indent=2))
-    if __name__ == "__main__":
-        main()
+        # 2. Locate Image (Dynamic extension handling)
+        possible_files = [f for f in os.listdir(DATASET_DIR) if f.startswith(f"img{img_num}.")]
+        if not possible_files:
+            raise FileNotFoundError(f"Could not find any image named 'img{img_num}' in {DATASET_DIR}")
+        
+        image_path = os.path.join(DATASET_DIR, possible_files[0])
+
+        # 3. Process
+        detector = load_ai_model()
+        top_3 = run_vision_scan(detector, image_path, tier)
+        
+        # 4. Output
+        final_payload = generate_output_payload(top_3)
+        
+        print("\n[SUCCESS] Pipeline Completed.")
+        print(f"[SUCCESS] Check {CURRENT_FRAME} for visual output.")
+        print(f"Data saved to {OUTPUT_JSON}:\n")
+        print(json.dumps(final_payload, indent=2))
+
+    except Exception as e:
+        print("\n[CRITICAL ERROR] The pipeline crashed!")
+        print("Here is the exact reason why:")
+        traceback.print_exc()
+
+if __name__ == "__main__":
+    main()
