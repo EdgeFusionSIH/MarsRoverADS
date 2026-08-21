@@ -1,3 +1,4 @@
+import time
 import json
 import os
 import shutil
@@ -25,6 +26,9 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATASET_DIR = os.path.join(BASE_DIR, "dataset")
 INPUT_DIR = os.path.join(BASE_DIR, "inputs")
 OUTPUT_DIR = os.path.join(BASE_DIR, "outputs")
+WEIGHTS_DIR = os.path.join(BASE_DIR, "weights")
+
+os.environ["HF_HOME"] = WEIGHTS_DIR
 
 INPUT_JSON = os.path.join(INPUT_DIR, "p2pn1n2Input.json")
 OUTPUT_JSON = os.path.join(OUTPUT_DIR, "p2pn1n2Output.json")
@@ -34,12 +38,13 @@ LAST_FRAME = os.path.join(OUTPUT_DIR, "lastFrame.jpg")
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 os.makedirs(DATASET_DIR, exist_ok=True)
 os.makedirs(INPUT_DIR, exist_ok=True)
+os.makedirs(WEIGHTS_DIR, exist_ok=True)
 
 # ============================================================
 # CORE FUNCTIONS
 # ============================================================
 def get_device():
-    """Detects your RTX 5050 to force GPU acceleration."""
+    """Detects CUDA to force GPU acceleration."""
     if torch.cuda.is_available():
         print(f"[SYSTEM] Hardware Acceleration Enabled: {torch.cuda.get_device_name(0)}")
         return 0 
@@ -47,13 +52,21 @@ def get_device():
         print("[SYSTEM] Warning: CUDA not found, falling back to CPU.")
         return -1
 
-def load_ai_model():
-    """Loads Google's Zero-Shot Vision Transformer."""
-    print("[AI] Loading OWL-ViT (Zero-Shot Space Vision)...")
+def load_ai_model(tier):
+    """Loads Google's Zero-Shot Vision Transformer based on the tier."""
+    if tier == "medium":
+        print("[AI] Loading OWLv2 Ensemble (Medium Usage / FP16)...")
+        model_name = "google/owlv2-base-patch16-ensemble"
+    else:
+        print("[AI] Loading OWLv2 Base (Low Usage / FP16)...")
+        model_name = "google/owlv2-base-patch16"
+
     return pipeline(
         task="zero-shot-object-detection",
-        model="google/owlvit-base-patch32",
-        device=get_device()
+        model=model_name,
+        device=get_device(),
+        dtype=torch.float16,
+        model_kwargs={"cache_dir": WEIGHTS_DIR}
     )
 
 def run_vision_scan(detector, image_path, tier):
@@ -131,7 +144,6 @@ def generate_output_payload(top_3):
         except Exception as e:
             print(f"[SYSTEM] Warning: sysUs telemetry execution failed ({e}).")
 
-    # Fixed the disk pathing issue for Windows compatibility 
     drive_path = os.path.abspath(os.sep)
     sysus_dict = {
         "nodeid": 1,
@@ -170,43 +182,57 @@ def main():
     print("  NODE 1 VISION: MARTIAN SURFACE PIPELINE")
     print("========================================")
 
-    try:
-        # 1. Read JSON safely
-        if not os.path.exists(INPUT_JSON):
-            raise FileNotFoundError(f"Missing input JSON at {INPUT_JSON}")
+    current_tier = None
+    detector = None
+
+    while True:
+        try:
+            # 1. Read JSON safely
+            if not os.path.exists(INPUT_JSON):
+                print(f"[SYSTEM] Waiting for input JSON at {INPUT_JSON}...")
+                time.sleep(0.2)
+                continue
+                
+            with open(INPUT_JSON, "r") as f:
+                input_data = json.load(f)
+                
+            img_num = input_data.get("img")
+            tier = input_data.get("model", "light").lower()
             
-        with open(INPUT_JSON, "r") as f:
-            input_data = json.load(f)
+            if not img_num:
+                print("[SYSTEM] Input JSON is missing the 'img' key.")
+                time.sleep(0.2)
+                continue
+
+            # Load or switch model if tier changed
+            if detector is None or current_tier != tier:
+                detector = load_ai_model(tier)
+                current_tier = tier
+
+            # 2. Locate Image (Dynamic extension handling)
+            possible_files = [f for f in os.listdir(DATASET_DIR) if f.startswith(f"img{img_num}.")]
+            if not possible_files:
+                print(f"[SYSTEM] Could not find any image named 'img{img_num}' in {DATASET_DIR}")
+                time.sleep(0.2)
+                continue
             
-        img_num = input_data.get("img")
-        tier = input_data.get("model", "light").lower()
-        
-        if not img_num:
-            raise ValueError("Input JSON is missing the 'img' key.")
+            image_path = os.path.join(DATASET_DIR, possible_files[0])
 
-        # 2. Locate Image (Dynamic extension handling)
-        possible_files = [f for f in os.listdir(DATASET_DIR) if f.startswith(f"img{img_num}.")]
-        if not possible_files:
-            raise FileNotFoundError(f"Could not find any image named 'img{img_num}' in {DATASET_DIR}")
-        
-        image_path = os.path.join(DATASET_DIR, possible_files[0])
+            # 3. Process
+            top_3 = run_vision_scan(detector, image_path, tier)
+            
+            # 4. Output
+            final_payload = generate_output_payload(top_3)
+            
+            print("\n[SUCCESS] Pipeline Completed for current frame.")
+            print(f"[SUCCESS] Check {CURRENT_FRAME} for visual output.")
 
-        # 3. Process
-        detector = load_ai_model()
-        top_3 = run_vision_scan(detector, image_path, tier)
-        
-        # 4. Output
-        final_payload = generate_output_payload(top_3)
-        
-        print("\n[SUCCESS] Pipeline Completed.")
-        print(f"[SUCCESS] Check {CURRENT_FRAME} for visual output.")
-        print(f"Data saved to {OUTPUT_JSON}:\n")
-        print(json.dumps(final_payload, indent=2))
+        except Exception as e:
+            print("\n[ERROR] Pipeline encountered an issue:")
+            traceback.print_exc()
 
-    except Exception as e:
-        print("\n[CRITICAL ERROR] The pipeline crashed!")
-        print("Here is the exact reason why:")
-        traceback.print_exc()
+        # Wait 0.2 seconds before next iteration
+        time.sleep(0.2)
 
 if __name__ == "__main__":
     main()

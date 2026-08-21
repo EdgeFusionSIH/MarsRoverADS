@@ -1,3 +1,4 @@
+import time
 import json
 import os
 import shutil
@@ -59,17 +60,15 @@ def load_ai_model(tier):
     if tier == "medium":
         print("[AI] Loading OWLv2 Ensemble (Medium Usage / FP16)...")
         model_name = "google/owlv2-base-patch16-ensemble"
-        dtype = torch.float16
     else:
-        print("[AI] Loading OWL-ViT Base (Low Usage / FP32)...")
-        model_name = "google/owlvit-base-patch32"
-        dtype = torch.float32
+        print("[AI] Loading OWLv2 Base (Low Usage / FP16)...")
+        model_name = "google/owlv2-base-patch16"
 
     return pipeline(
         task="zero-shot-object-detection",
         model=model_name,
         device=get_device(),
-        torch_dtype=dtype,
+        dtype=torch.float16,
         model_kwargs={"cache_dir": WEIGHTS_DIR}
     )
 
@@ -186,43 +185,57 @@ def main():
     print("  NODE 1 VISION: MARTIAN SURFACE PIPELINE")
     print("========================================")
 
-    try:
-        # 1. Read JSON safely
-        if not os.path.exists(INPUT_JSON):
-            raise FileNotFoundError(f"Missing input JSON at {INPUT_JSON}")
+    current_tier = None
+    detector = None
+
+    while True:
+        try:
+            # 1. Read JSON safely
+            if not os.path.exists(INPUT_JSON):
+                print(f"[SYSTEM] Waiting for input JSON at {INPUT_JSON}...")
+                time.sleep(0.2)
+                continue
+                
+            with open(INPUT_JSON, "r") as f:
+                input_data = json.load(f)
+                
+            img_num = input_data.get("img")
+            tier = input_data.get("model", "light").lower()
             
-        with open(INPUT_JSON, "r") as f:
-            input_data = json.load(f)
+            if not img_num:
+                print("[SYSTEM] Input JSON is missing the 'img' key.")
+                time.sleep(0.2)
+                continue
+
+            # Load or switch model if tier changed
+            if detector is None or current_tier != tier:
+                detector = load_ai_model(tier)
+                current_tier = tier
+
+            # 2. Locate Image (Dynamic extension handling)
+            possible_files = [f for f in os.listdir(DATASET_DIR) if f.startswith(f"img{img_num}.")]
+            if not possible_files:
+                print(f"[SYSTEM] Could not find any image named 'img{img_num}' in {DATASET_DIR}")
+                time.sleep(0.2)
+                continue
             
-        img_num = input_data.get("img")
-        tier = input_data.get("model", "light").lower()
-        
-        if not img_num:
-            raise ValueError("Input JSON is missing the 'img' key.")
+            image_path = os.path.join(DATASET_DIR, possible_files[0])
 
-        # 2. Locate Image (Dynamic extension handling)
-        possible_files = [f for f in os.listdir(DATASET_DIR) if f.startswith(f"img{img_num}.")]
-        if not possible_files:
-            raise FileNotFoundError(f"Could not find any image named 'img{img_num}' in {DATASET_DIR}")
-        
-        image_path = os.path.join(DATASET_DIR, possible_files[0])
+            # 3. Process
+            top_3 = run_vision_scan(detector, image_path, tier)
+            
+            # 4. Output
+            final_payload = generate_output_payload(top_3)
+            
+            print("\n[SUCCESS] Pipeline Completed for current frame.")
+            print(f"[SUCCESS] Check {CURRENT_FRAME} for visual output.")
 
-        # 3. Process
-        detector = load_ai_model(tier)
-        top_3 = run_vision_scan(detector, image_path, tier)
-        
-        # 4. Output
-        final_payload = generate_output_payload(top_3)
-        
-        print("\n[SUCCESS] Pipeline Completed.")
-        print(f"[SUCCESS] Check {CURRENT_FRAME} for visual output.")
-        print(f"Data saved to {OUTPUT_JSON}:\n")
-        print(json.dumps(final_payload, indent=2))
+        except Exception as e:
+            print("\n[ERROR] Pipeline encountered an issue:")
+            traceback.print_exc()
 
-    except Exception as e:
-        print("\n[CRITICAL ERROR] The pipeline crashed!")
-        print("Here is the exact reason why:")
-        traceback.print_exc()
+        # Wait 0.2 seconds before next iteration
+        time.sleep(0.2)
 
 if __name__ == "__main__":
     main()
