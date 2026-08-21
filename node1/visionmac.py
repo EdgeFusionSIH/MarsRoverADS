@@ -1,0 +1,241 @@
+import time
+import json
+import os
+import shutil
+import traceback
+import cv2
+import torch
+import psutil
+from PIL import Image
+from transformers import pipeline
+
+# ============================================================
+# SAFE TELEMETRY IMPORT
+# ============================================================
+try:
+    import sysUs
+    SYSUS_AVAILABLE = True
+except ImportError:
+    SYSUS_AVAILABLE = False
+    print("[SYSTEM] Warning: sysUs.py not found or broken. Using default telemetry values.")
+
+# ============================================================
+# DIRECTORY SETUP (Bulletproof Paths)
+# ============================================================
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DATASET_DIR = os.path.join(BASE_DIR, "dataset")
+INPUT_DIR = os.path.join(BASE_DIR, "inputs")
+OUTPUT_DIR = os.path.join(BASE_DIR, "outputs")
+WEIGHTS_DIR = os.path.join(BASE_DIR, "weights")
+
+os.environ["HF_HOME"] = WEIGHTS_DIR
+
+INPUT_JSON = os.path.join(INPUT_DIR, "p2pn1n2Input.json")
+OUTPUT_JSON = os.path.join(OUTPUT_DIR, "p2pn1n2Output.json")
+CURRENT_FRAME = os.path.join(OUTPUT_DIR, "currentFrame.jpg")
+LAST_FRAME = os.path.join(OUTPUT_DIR, "lastFrame.jpg")
+
+os.makedirs(OUTPUT_DIR, exist_ok=True)
+os.makedirs(DATASET_DIR, exist_ok=True)
+os.makedirs(INPUT_DIR, exist_ok=True)
+os.makedirs(WEIGHTS_DIR, exist_ok=True)
+
+# ============================================================
+# CORE FUNCTIONS
+# ============================================================
+def get_device():
+    """Detects Mac (MPS) to force GPU acceleration."""
+    if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+        print("[SYSTEM] Hardware Acceleration Enabled: Apple Silicon (MPS)")
+        return "mps"
+    elif torch.cuda.is_available():
+        print(f"[SYSTEM] Hardware Acceleration Enabled: {torch.cuda.get_device_name(0)}")
+        return 0 
+    else:
+        print("[SYSTEM] Warning: GPU not found, falling back to CPU.")
+        return -1
+
+def load_ai_model(tier):
+    """Loads Google's Zero-Shot Vision Transformer based on the tier."""
+    if tier == "medium":
+        print("[AI] Loading OWLv2 Ensemble (Medium Usage / FP16)...")
+        model_name = "google/owlv2-base-patch16-ensemble"
+    else:
+        print("[AI] Loading OWLv2 Base (Low Usage / FP16)...")
+        model_name = "google/owlv2-base-patch16"
+
+    return pipeline(
+        task="zero-shot-object-detection",
+        model=model_name,
+        device=get_device(),
+        dtype=torch.float16,
+        model_kwargs={"cache_dir": WEIGHTS_DIR}
+    )
+
+def run_vision_scan(detector, image_path, tier):
+    """Scans the image based on the JSON tier requirements."""
+    print(f"\n[VISION] Processing image: {image_path}")
+    
+    img_cv = cv2.imread(image_path)
+    if img_cv is None:
+        raise ValueError(f"OpenCV could not read the image at {image_path}. File might be corrupted.")
+    
+    img_pil = Image.open(image_path).convert("RGB")
+    
+    # ---------------------------------------------------------
+    # TIER SYSTEM: Changes targets and strictness based on JSON
+    # ---------------------------------------------------------
+    if tier == "medium":
+        print("[VISION] Tier: MEDIUM -> Deep Scan (High GPU usage)")
+        targets = ["boulder", "rock", "crater", "surface crack", "sand dune", "crevasse"]
+        threshold = 0.05
+    else:
+        print("[VISION] Tier: LIGHT -> Fast Scan (Low GPU usage)")
+        targets = ["boulder", "crater", "rock"]
+        threshold = 0.08
+
+    print(f"[VISION] Hunting for: {targets}")
+    
+    predictions = detector(img_pil, candidate_labels=targets)
+    raw_detections = []
+    
+    for pred in predictions:
+        conf = pred['score']
+        if conf >= threshold:
+            raw_detections.append({
+                "object": pred['label'],
+                "confidence": round(conf, 2),
+                "box": pred['box']
+            })
+            
+    # SORT AND EXTRACT STRICTLY TOP 3
+    raw_detections = sorted(raw_detections, key=lambda x: x['confidence'], reverse=True)
+    top_3 = raw_detections[:3]
+    
+    # Draw boxes
+    img_with_boxes = img_cv.copy()
+    for det in top_3:
+        box = det['box']
+        name = det['object']
+        conf = det['confidence']
+        
+        x1, y1, x2, y2 = int(box['xmin']), int(box['ymin']), int(box['xmax']), int(box['ymax'])
+        cv2.rectangle(img_with_boxes, (x1, y1), (x2, y2), (0, 165, 255), 2)
+        cv2.putText(img_with_boxes, f"{name} {conf}", (x1, y1 - 10), 
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 165, 255), 2)
+
+    # Output management
+    if os.path.exists(CURRENT_FRAME):
+        shutil.move(CURRENT_FRAME, LAST_FRAME)
+    cv2.imwrite(CURRENT_FRAME, img_with_boxes)
+    
+    return top_3
+
+def generate_output_payload(top_3):
+    """Builds the JSON payload for Node 2."""
+    print("\n[SYSTEM] Gathering Telemetry & Building JSON...")
+    
+    cpu_val = gpu_val = ram_val = 0.0
+    
+    # Safely pull from custom telemetry script if it exists
+    if SYSUS_AVAILABLE:
+        try:
+            raw_sys = sysUs.get_system_info()
+            cpu_val = raw_sys.get("cpu", raw_sys.get("cpu_usage_percent", 0.0))
+            gpu_val = raw_sys.get("gpu", 0.0)
+            ram_val = raw_sys.get("ram", raw_sys.get("ram_usage_percent", 0.0))
+        except Exception as e:
+            print(f"[SYSTEM] Warning: sysUs telemetry execution failed ({e}).")
+
+    drive_path = os.path.abspath(os.sep)
+    sysus_dict = {
+        "nodeid": 1,
+        "cpu": cpu_val,
+        "gpu": gpu_val,
+        "ram": ram_val,
+        "disk": round(psutil.disk_usage(drive_path).percent, 1)
+    }
+    
+    objects_dict = {}
+    for i in range(1, 4):
+        if i <= len(top_3):
+            objects_dict[f"obj{i}"] = top_3[i-1]["object"]
+            objects_dict[f"conf{i}"] = top_3[i-1]["confidence"]
+        else:
+            objects_dict[f"obj{i}"] = "nill"
+            objects_dict[f"conf{i}"] = 0.0
+
+    output_json = {
+        "from": "node1",
+        "to": "node2",
+        "sysus": sysus_dict,
+        "objects": objects_dict
+    }
+    
+    with open(OUTPUT_JSON, "w") as f:
+        json.dump(output_json, f, indent=4)
+        
+    return output_json
+
+# ============================================================
+# MAIN EXECUTION ROUTINE
+# ============================================================
+def main():
+    print("========================================")
+    print("  NODE 1 VISION: MARTIAN SURFACE PIPELINE")
+    print("========================================")
+
+    current_tier = None
+    detector = None
+
+    while True:
+        try:
+            # 1. Read JSON safely
+            if not os.path.exists(INPUT_JSON):
+                print(f"[SYSTEM] Waiting for input JSON at {INPUT_JSON}...")
+                time.sleep(0.2)
+                continue
+                
+            with open(INPUT_JSON, "r") as f:
+                input_data = json.load(f)
+                
+            img_num = input_data.get("img")
+            tier = input_data.get("model", "light").lower()
+            
+            if not img_num:
+                print("[SYSTEM] Input JSON is missing the 'img' key.")
+                time.sleep(0.2)
+                continue
+
+            # Load or switch model if tier changed
+            if detector is None or current_tier != tier:
+                detector = load_ai_model(tier)
+                current_tier = tier
+
+            # 2. Locate Image (Dynamic extension handling)
+            possible_files = [f for f in os.listdir(DATASET_DIR) if f.startswith(f"img{img_num}.")]
+            if not possible_files:
+                print(f"[SYSTEM] Could not find any image named 'img{img_num}' in {DATASET_DIR}")
+                time.sleep(0.2)
+                continue
+            
+            image_path = os.path.join(DATASET_DIR, possible_files[0])
+
+            # 3. Process
+            top_3 = run_vision_scan(detector, image_path, tier)
+            
+            # 4. Output
+            final_payload = generate_output_payload(top_3)
+            
+            print("\n[SUCCESS] Pipeline Completed for current frame.")
+            print(f"[SUCCESS] Check {CURRENT_FRAME} for visual output.")
+
+        except Exception as e:
+            print("\n[ERROR] Pipeline encountered an issue:")
+            traceback.print_exc()
+
+        # Wait 0.2 seconds before next iteration
+        time.sleep(0.2)
+
+if __name__ == "__main__":
+    main()
