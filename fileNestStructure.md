@@ -1,38 +1,72 @@
-- Readme.md
+- README.md
+- fileNestStructure.md
+- jsonFormats.md
+- ips.json
+- generate_csv.py
 
-- node1 {Taman's Laptop}
-	- dataset
+- node1 {Taman's Laptop — Vision/Inference}
+	- dataset/
 		- systemInfo.json
 		- img1.jpg
-		- img2.jpg ...
-	- inputs 
-		- p2pn1n2Input.json {Image number, Model to be used}
-		- p2pn1n3Input.json {NIL}
-	- vision.py //{running the yolo multi-server and also writes systemInfo in node1/outputs/p2pn1n3Output.json}
-	- sysUs.py //{running find system usage finder}
-	- p2pn1n3.py {websocket between node1 and node 3, sending lastFrame.jpg}
-	- p2pn1n2.py {websocket between node1 and node 2, sending p2pn1n2Output.json, recieving p2pn1n2Input.json}
-	- outputs
-		- p2pn1n3Output.json {NIL}
-		- p2pn1n3Output.json {System usage and contains obj name, confidence%}
-		- currentFrame.jpg
-		- lastFrame.jpg
+		- img2.jpg
+	- inputs/
+		- p2pn1n2Input.json {Receives target image number and model selection from Node 2}
+		- p2pn1n3Input.json {Empty/NIL}
+	- outputs/
+		- currentFrame.jpg {Current frame being processed}
+		- lastFrame.jpg {Processed frame with bounding boxes}
+		- p2pn1n2Output.json {System usage, object name, confidence %}
+		- p2pn1n3Output.json {Empty/NIL}
+	- main.py {Main loop executing vision logic}
+	- node1Main.py {Launcher for all Node 1 subprocesses}
+	- p2pn1n2.py {WebSocket communicating with Node 2}
+	- p2pn1n3.py {WebSocket communicating with Node 3, sending lastFrame.jpg}
+	- sysUs.py {Monitors Node 1 system hardware usage}
+	- vision.py {Runs YOLO inference on requested frames}
+	- file_calling.md {Node 1 execution sequence docs}
+	- yolov8m.pt {Medium YOLOv8 model weights}
+	- yolov8n.pt {Nano YOLOv8 model weights}
 
-- node2 {Aarav's Mac}
-	- dataset
-		- telemetry.csv {include timestamps and also img.jpg acc. to the timestamps}
+- node2 {Aarav's Mac — Core Engine/Control}
+	- dataset/
+		- mars_rover_sensor_data.csv {Primary telemetry CSV (Normal, Dust Storm, Sand Trap)}
+		- telemetry.csv {Alternative/Old telemetry data}
 		- systemInfo.json
-	- inputs 
-		- p2pn1n2Input.json //{Sys info and object detection info}
-		- p2pn2n3Input.json //{Chaos Bench}
-	- checker.py //{running the csv file interpretation server}
-	- main.py
-	- sysUs.py //{Runs to find system usage}
-	- p2pn2n3.py //{Websocket for the node1 and node 2, sending p2pn1n2Output.json, p2pn1n2Input.json}
-	- p2pn1n2.py
-	- Outputs
-		- p2pn1n2Output.json //{Image number, Model to be used}
-		- p2pn2n3Output.json //{Node sys info, Models Used, wheelslip, torque, wheelslipHistory, torqueHistory, Fusion Brain}
+	- inputs/
+		- p2pn1n2Input.json {Node 1 sys info and object detection results}
+		- p2pn2n3Input.json {Chaos Bench commands from Node 3}
+	- outputs/
+		- p2pn1n2Output.json {Commands Node 1 on which image and model to use}
+		- p2pn2n3Output.json {Node hardware stats, selected model, kinematic history, fusion brain classification, and commands}
+	- checker.py {Empty placeholder / old CSV interpretation server}
+	- main.py {Core Engine: handles CSV progression, Chaos integration, Complexity Engine, and Fusion Brain}
+	- node2Main.py {Launcher for all Node 2 subprocesses}
+	- p2pn1n2.py {WebSocket communicating with Node 1}
+	- p2pn2n3.py {WebSocket communicating with Node 3}
+	- sysUs.py {Monitors Node 2 system hardware usage}
 
-- node3 {Bhavika's Laptop}
-	
+- node3 {Bhavika's Laptop — GUI Dashboard}
+	- dataset/
+		- systemInfo.json
+	- inputs/
+		- lastFrame.jpg {Received from Node 1}
+		- p2pn1n3Input.json {Received from Node 1}
+		- p2pn2n3Input.json {Received from Node 2 (Telemetry & Fusion Brain outputs)}
+	- outputs/
+		- p2pn1n3Output.json {Empty/NIL}
+		- p2pn2n3Output.json {Chaos Bench states sent to Node 2}
+		- node3_console.log {Flight Recorder raw logs generated at runtime}
+	- GUI/ {React/Vite Dashboard Frontend}
+		- public/
+			- telemetry.json {Parsed telemetry served to React frontend}
+			- last_frame.jpg {Served to React frontend}
+		- src/
+			- App.jsx {Main React dashboard component}
+			- main.jsx
+			- App.css
+		- package.json
+		- vite.config.js {Includes proxy for /api/chaos HTTP server}
+	- guiBackend.py {Translates P2P JSONs to telemetry.json, handles Flight Recorder logs, and runs the Chaos Bench HTTP server}
+	- node3Main.py {Launcher for all Node 3 subprocesses (also captures stdout to node3_console.log)}
+	- p2pn1n3.py {WebSocket server for Node 1}
+	- p2pn2n3.py {WebSocket server for Node 2}

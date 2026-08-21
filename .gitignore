@@ -231,5 +231,35 @@ __marimo__/
 /node3/outputs/
 weights/
 .DS_Store
+/weights
+node_modules/
+
+# Runtime GUI outputs (written by guiBackend.py, polled by frontend)
+**/GUI/public/telemetry.json
+**/GUI/public/last_frame.jpg
+
+# Node GUI ignores
+logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+dist
+dist-ssr
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+node3/GUI/public/telemetry.json
+/weights
+/node1/weights
 /node3/GUI/public/last_frame.jpg
 /node3/GUI/public/telemetry.json
